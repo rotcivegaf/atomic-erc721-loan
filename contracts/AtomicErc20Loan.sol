@@ -62,7 +62,7 @@ contract AtomicErc20Loan {
             "signedAtomicLoan: Error lend erc20 tokens"
         );
 
-        IBorrower(msg.sender).onERC20Received(_token20, _amount);
+        IBorrower(msg.sender).onERC20Received(_token20, _amount, _price);
 
         require(
             _token20.safeTransferFrom(msg.sender, owner, _amount),
