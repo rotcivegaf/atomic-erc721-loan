@@ -73,7 +73,7 @@ contract AtomicErc20Loan {
             // Charge the loan price
             require(
                 _token20.safeTransferFrom(msg.sender, owner, _price),
-                "signedAtomicLoan: Error transfer erc20 tokens"
+                "signedAtomicLoan: Error pay erc20 tokens"
             );
         }
 
