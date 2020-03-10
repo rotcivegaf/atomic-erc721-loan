@@ -4,6 +4,18 @@ module.exports.expect = require('chai')
   .use(require('bn-chai')(BN))
   .expect;;
 
+module.exports.random32bn = () => {
+  return this.bn(this.random32());
+};
+
+module.exports.random32 = () => {
+  return web3.utils.randomHex(32);
+};
+
+module.exports.bn = (number) => {
+  return web3.utils.toBN(number);
+};
+
 module.exports.getEventFromTx = (tx, contract, eventName) => {
   eventABI = contract._jsonInterface.find(x => x.name === eventName);
   eventRawLog = tx.receipt.rawLogs.find(x => x.topics[0] === eventABI.signature);
