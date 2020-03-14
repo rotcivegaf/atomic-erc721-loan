@@ -2,7 +2,7 @@ const BN = web3.utils.BN;
 
 module.exports.expect = require('chai')
   .use(require('bn-chai')(BN))
-  .expect;;
+  .expect;
 
 module.exports.random32bn = () => {
   return this.bn(this.random32());
@@ -17,8 +17,8 @@ module.exports.bn = (number) => {
 };
 
 module.exports.getEventFromTx = (tx, contract, eventName) => {
-  eventABI = contract._jsonInterface.find(x => x.name === eventName);
-  eventRawLog = tx.receipt.rawLogs.find(x => x.topics[0] === eventABI.signature);
+  const eventABI = contract._jsonInterface.find(x => x.name === eventName);
+  const eventRawLog = tx.receipt.rawLogs.find(x => x.topics[0] === eventABI.signature);
 
   return web3.eth.abi.decodeLog(
     eventABI.inputs,

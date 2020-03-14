@@ -38,8 +38,6 @@ contract AtomicErc20Loan {
     // External functions
 
     /**
-        @notice Cancel a loan hash
-
         @param _token20 The address of the ERC20 token contract
     */
     function signedAtomicLoan(

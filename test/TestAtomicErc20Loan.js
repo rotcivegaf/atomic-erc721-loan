@@ -56,7 +56,7 @@ contract('AtomicErc20Loan', (accounts) => {
       loanHash: hash,
       v: 27 + web3.utils.hexToNumber(signature.slice(130, 132)),
       r: signature.slice(0, 66),
-      s: "0x" + signature.slice(66, 130),
+      s: '0x' + signature.slice(66, 130),
     };
   }
 
@@ -72,7 +72,7 @@ contract('AtomicErc20Loan', (accounts) => {
   });
 
   it('Function cancelHash', async () => {
-    fee = random32bn();
+    const fee = random32bn();
     const vrs = await calcSig(fee, signer);
 
     assert.isFalse(await atomic.canceledHashes(signer, vrs.loanHash));
@@ -92,7 +92,7 @@ contract('AtomicErc20Loan', (accounts) => {
     assert.isTrue(await atomic.canceledHashes(signer, vrs.loanHash));
   });
   it('Re-approve a hash', async () => {
-    fee = random32bn();
+    const fee = random32bn();
     const vrs = await calcSig(fee, signer);
 
     await atomic.cancelHash(erc20.address, fee, { from: signer });

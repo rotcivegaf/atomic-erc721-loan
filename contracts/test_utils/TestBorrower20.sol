@@ -62,9 +62,9 @@ contract TestBorrower20 is IERC20TokenReceiver {
 
     function onERC20Received(address _owner, IERC20 _token, uint256 _amount, uint256 _price) external override {
         if (action == Action.RETURN_PAY)
-            require(_token.safeTransfer(_owner, _amount + _price),"onERC20Received: error transfer atomicErc20Loan");
+            require(_token.safeTransfer(_owner, _amount + _price), "onERC20Received: error transfer atomicErc20Loan");
         else if (action == Action.NOT_PAY)
-            require(_token.safeTransfer(_owner, _amount),"onERC20Received: error transfer atomicErc20Loan");
+            require(_token.safeTransfer(_owner, _amount), "onERC20Received: error transfer atomicErc20Loan");
 
         action = Action.RETURN_PAY;
     }
