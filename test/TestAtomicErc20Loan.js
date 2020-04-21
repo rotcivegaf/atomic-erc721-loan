@@ -5,7 +5,7 @@ const AtomicErc20Loan = artifacts.require('AtomicErc20Loan');
 
 const {
   bn,
-  random32bn,
+  random10bn,
   expect,
   tryCatchRevert,
   getEventFromTx,
@@ -72,7 +72,7 @@ contract('AtomicErc20Loan', (accounts) => {
   });
 
   it('Function cancelHash', async () => {
-    const fee = random32bn();
+    const fee = random10bn();
     const vrs = await calcSig(fee, signer);
 
     assert.isFalse(await atomic.canceledHashes(signer, vrs.loanHash));
@@ -92,7 +92,7 @@ contract('AtomicErc20Loan', (accounts) => {
     assert.isTrue(await atomic.canceledHashes(signer, vrs.loanHash));
   });
   it('Re-approve a hash', async () => {
-    const fee = random32bn();
+    const fee = random10bn();
     const vrs = await calcSig(fee, signer);
 
     await atomic.cancelHash(erc20.address, fee, { from: signer });

@@ -47,6 +47,10 @@ contract TestBorrower721 is IERC721TokenReceiver, ILoan721Pay {
         );
     }
 
+    function atomicLoan(bytes32 _loanHash) external {
+        atomicErc721Loan.atomicLoan(_loanHash);
+    }
+
     function onERC721Received(address, address _from, uint256 _tokenId, bytes calldata) external override returns(bytes4) {
         _onERC721Received(_from, _tokenId);
 
@@ -68,12 +72,14 @@ contract TestBorrower721 is IERC721TokenReceiver, ILoan721Pay {
     ) external override {
         if (payPrice)
             require(_token20.safeTransfer(_owner, _price), "pay: error transfer erc20 tokens");
+
         payPrice = true;
     }
 
     function _onERC721Received(address _from, uint256 _tokenId) internal {
         if (returnToken)
             IERC721(msg.sender).transferFrom(address(this), _from, _tokenId);
+
         returnToken = true;
     }
 }

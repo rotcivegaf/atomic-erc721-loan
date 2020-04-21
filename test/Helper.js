@@ -4,8 +4,8 @@ module.exports.expect = require('chai')
   .use(require('bn-chai')(BN))
   .expect;
 
-module.exports.random32bn = () => {
-  return this.bn(this.random32());
+module.exports.random10bn = () => {
+  return this.bn(web3.utils.randomHex(10));
 };
 
 module.exports.random32 = () => {
