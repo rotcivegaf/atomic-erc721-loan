@@ -29,7 +29,8 @@ contract AtomicErc721Loan {
         IERC721 _token721,
         uint256 _tokenId,
         IERC20 _token20,
-        uint256 _price
+        uint256 _price,
+        uint256 _expiry
     );
 
     event ApprobeAtomicLoan(
@@ -43,14 +44,16 @@ contract AtomicErc721Loan {
         IERC721 _token721,
         uint256 _tokenId,
         IERC20 _token20,
-        uint256 _price
+        uint256 _price,
+        uint256 _expiry
     );
 
     event ReApproveHash(
         IERC721 _token721,
         uint256 _tokenId,
         IERC20 _token20,
-        uint256 _price
+        uint256 _price,
+        uint256 _expiry
     );
 
     // External functions
@@ -61,10 +64,10 @@ contract AtomicErc721Loan {
         IERC20 _token20,
         uint256 _price
     ) external {
-        bytes32 loanHash = _calcHash(_token721, _tokenId, _token20, _price);
+        bytes32 loanHash = _calcHash(_token721, _tokenId, _token20, _price, 0);
 
         if(canceledHashes[msg.sender][loanHash])
-            reApproveHash(_token721, _tokenId, _token20, _price);
+            reApproveHash(_token721, _tokenId, _token20, _price, 0);
 
         loans[loanHash] = Loan({
             owner: msg.sender,
@@ -86,11 +89,12 @@ contract AtomicErc721Loan {
         IERC721 _token721,
         uint256 _tokenId,
         IERC20 _token20,
-        uint256 _price
+        uint256 _price,
+        uint256 _expiry
     ) external {
-        canceledHashes[msg.sender][_calcHash(_token721, _tokenId, _token20, _price)] = true;
+        canceledHashes[msg.sender][_calcHash(_token721, _tokenId, _token20, _price, _expiry)] = true;
 
-        emit CancelHash(_token721, _tokenId, _token20, _price);
+        emit CancelHash(_token721, _tokenId, _token20, _price, _expiry);
     }
 
     /**
@@ -102,11 +106,12 @@ contract AtomicErc721Loan {
         IERC721 _token721,
         uint256 _tokenId,
         IERC20 _token20,
-        uint256 _price
+        uint256 _price,
+        uint256 _expiry
     ) public {
-        canceledHashes[msg.sender][_calcHash(_token721, _tokenId, _token20, _price)] = false;
+        canceledHashes[msg.sender][_calcHash(_token721, _tokenId, _token20, _price, _expiry)] = false;
 
-        emit ReApproveHash(_token721, _tokenId, _token20, _price);
+        emit ReApproveHash(_token721, _tokenId, _token20, _price, _expiry);
     }
 
     function signedAtomicLoan(
@@ -114,11 +119,14 @@ contract AtomicErc721Loan {
         uint256 _tokenId,
         IERC20 _token20,
         uint256 _price,
+        uint256 _expiry,
         uint8 _v,
         bytes32 _r,
         bytes32 _s
     ) external {
-        bytes32 loanHash = _calcHash(_token721, _tokenId, _token20, _price);
+        require(now <= _expiry, "signedAtomicLoan: The signature expired");
+
+        bytes32 loanHash = _calcHash(_token721, _tokenId, _token20, _price, _expiry);
         address owner = ecrecover(
             keccak256(
                 abi.encodePacked(
@@ -137,6 +145,7 @@ contract AtomicErc721Loan {
             _tokenId,
             _token20,
             _price,
+            _expiry,
             loanHash
         );
     }
@@ -150,6 +159,7 @@ contract AtomicErc721Loan {
             loan.tokenId,
             loan.token20,
             loan.price,
+            0,
             _loanHash
         );
     }
@@ -160,7 +170,8 @@ contract AtomicErc721Loan {
         IERC721 _token721,
         uint256 _tokenId,
         IERC20 _token20,
-        uint256 _price
+        uint256 _price,
+        uint256 _expiry
     ) internal view returns(bytes32) {
         return keccak256(
             abi.encodePacked(
@@ -168,7 +179,8 @@ contract AtomicErc721Loan {
                 _token721,
                 _tokenId,
                 _token20,
-                _price
+                _price,
+                _expiry
             )
         );
     }
@@ -179,6 +191,7 @@ contract AtomicErc721Loan {
         uint256 _tokenId,
         IERC20 _token20,
         uint256 _price,
+        uint256 _expiry,
         bytes32 _loanHash
     ) internal {
         require(!canceledHashes[_owner][_loanHash], "_atomicLoan: The loan hash was canceled");
@@ -193,6 +206,6 @@ contract AtomicErc721Loan {
 
         require(_token20.balanceOf(_owner).sub(ownerPrevBal) == _price, "_atomicLoan: Error pay the loan price");
 
-        emit AtomicLoan(_owner, _token721, _tokenId, _token20, _price);
+        emit AtomicLoan(_owner, _token721, _tokenId, _token20, _price,_expiry);
     }
 }

@@ -10,11 +10,13 @@ const {
   tryCatchRevert,
   getEventFromTx,
   toEvents,
+  bn,
 } = require('./Helper.js');
 
 contract('AtomicErc721Loan', (accounts) => {
   const signer = accounts[1];
   const anAddress = accounts[2];
+  const hightExpiry = bn('2').pow(bn('256')).sub(bn('1'));
 
   let signerBal = 0;
   let anAddressBal = 0;
@@ -41,18 +43,19 @@ contract('AtomicErc721Loan', (accounts) => {
     await erc721.approve(atomic.address, tokenId, { from: beneficiary });
   }
 
-  function calcHash (tokenId, price, signer) {
+  function calcHash (tokenId, price, expiry) {
     return web3.utils.soliditySha3(
       { t: 'address', v: atomic.address },
       { t: 'address', v: erc721.address },
       { t: 'uint256', v: tokenId },
       { t: 'address', v: erc20.address },
-      { t: 'uint256', v: price }
+      { t: 'uint256', v: price },
+      { t: 'uint256', v: expiry }
     );
   }
 
-  async function calcSig (tokenId, price, signer) {
-    const loanHash = calcHash(tokenId, price);
+  async function calcSig (tokenId, price, expiry, signer) {
+    const loanHash = calcHash(tokenId, price, expiry);
     const signature = await web3.eth.sign(loanHash, signer);
 
     return {
@@ -74,7 +77,7 @@ contract('AtomicErc721Loan', (accounts) => {
   it('Function cancelHash', async () => {
     const tokenId = random10bn();
     const price = random10bn();
-    const vrs = await calcSig(tokenId, price, signer);
+    const vrs = await calcSig(tokenId, price, hightExpiry, signer);
 
     assert.isFalse(await atomic.canceledHashes(signer, vrs.loanHash));
 
@@ -84,6 +87,7 @@ contract('AtomicErc721Loan', (accounts) => {
         tokenId,
         erc20.address,
         price,
+        hightExpiry,
         { from: signer }
       ),
       'CancelHash'
@@ -93,6 +97,7 @@ contract('AtomicErc721Loan', (accounts) => {
     expect(CancelHash._tokenId).to.eq.BN(tokenId);
     assert.equal(CancelHash._token20, erc20.address);
     expect(CancelHash._price).to.eq.BN(price);
+    expect(CancelHash._expiry).to.eq.BN(hightExpiry);
 
     assert.isTrue(await atomic.canceledHashes(signer, vrs.loanHash));
   });
@@ -100,9 +105,9 @@ contract('AtomicErc721Loan', (accounts) => {
   it('Re-approve a hash', async () => {
     const tokenId = random10bn();
     const price = random10bn();
-    const vrs = await calcSig(tokenId, price, signer);
+    const vrs = await calcSig(tokenId, price, hightExpiry, signer);
 
-    await atomic.cancelHash(erc721.address, tokenId, erc20.address, price, { from: signer });
+    await atomic.cancelHash(erc721.address, tokenId, erc20.address, price, hightExpiry, { from: signer });
 
     assert.isTrue(await atomic.canceledHashes(signer, vrs.loanHash));
 
@@ -112,6 +117,7 @@ contract('AtomicErc721Loan', (accounts) => {
         tokenId,
         erc20.address,
         price,
+        hightExpiry,
         { from: signer }
       ),
       'ReApproveHash'
@@ -121,13 +127,14 @@ contract('AtomicErc721Loan', (accounts) => {
     expect(ReApproveHash._tokenId).to.eq.BN(tokenId);
     assert.equal(ReApproveHash._token20, erc20.address);
     expect(ReApproveHash._price).to.eq.BN(price);
+    expect(ReApproveHash._expiry).to.eq.BN(hightExpiry);
 
     assert.isFalse(await atomic.canceledHashes(signer, vrs.loanHash));
   });
 
   describe('Function _atomicLoan', function () {
-    it('try do a signed atomic loan without be a contract', async () => {
-      const vrs = await calcSig(0, 0, signer);
+    it('try do an atomic loan without be a contract', async () => {
+      const vrs = await calcSig(0, 0, hightExpiry, signer);
 
       await tryCatchRevert(
         () => atomic.signedAtomicLoan(
@@ -135,6 +142,7 @@ contract('AtomicErc721Loan', (accounts) => {
           0,
           erc20.address,
           0,
+          hightExpiry,
           vrs.v,
           vrs.r,
           vrs.s,
@@ -143,9 +151,9 @@ contract('AtomicErc721Loan', (accounts) => {
         ''
       );
     });
-    it('try do a signed atomic loan without pay the price', async () => {
+    it('try do an atomic loan without pay the price', async () => {
       const tokenId = random10bn();
-      const vrs = await calcSig(tokenId, 1, signer);
+      const vrs = await calcSig(tokenId, 1, hightExpiry, signer);
 
       await createApprove(signer, tokenId);
       await erc20.setBalance(borrowerC.address, 0);
@@ -156,6 +164,7 @@ contract('AtomicErc721Loan', (accounts) => {
           tokenId,
           erc20.address,
           1,
+          hightExpiry,
           vrs.v,
           vrs.r,
           vrs.s,
@@ -174,6 +183,7 @@ contract('AtomicErc721Loan', (accounts) => {
           tokenId,
           erc20.address,
           1,
+          hightExpiry,
           vrs.v,
           vrs.r,
           vrs.s,
@@ -182,9 +192,9 @@ contract('AtomicErc721Loan', (accounts) => {
         '_atomicLoan: Error pay the loan price'
       );
     });
-    it('try do a signed atomic loan but the borrower contract dont return the erc721 token', async () => {
+    it('try do an atomic loan but the borrower contract dont return the erc721 token', async () => {
       const tokenId = random10bn();
-      const vrs = await calcSig(tokenId, 0, signer);
+      const vrs = await calcSig(tokenId, 0, hightExpiry, signer);
 
       await createApprove(signer, tokenId);
       await borrowerC.setReturnToken(false);
@@ -195,6 +205,7 @@ contract('AtomicErc721Loan', (accounts) => {
           tokenId,
           erc20.address,
           0,
+          hightExpiry,
           vrs.v,
           vrs.r,
           vrs.s,
@@ -205,11 +216,10 @@ contract('AtomicErc721Loan', (accounts) => {
 
       await borrowerC.setReturnToken(true);
     });
-    it('try do a atomic loan with a cancel hash', async () => {
-      const vrs = await calcSig(0, 0, signer);
-      await atomic.approbeAtomicLoan(erc721.address, 0, erc20.address, 0, { from: signer });
+    it('try do a signed atomic loan with a cancel hash', async () => {
+      const vrs = await calcSig(0, 0, hightExpiry, signer);
 
-      await atomic.cancelHash(erc721.address, 0, erc20.address, 0, { from: signer });
+      await atomic.cancelHash(erc721.address, 0, erc20.address, 0, hightExpiry, { from: signer });
 
       await tryCatchRevert(
         () => borrowerC.signedAtomicLoan(
@@ -217,6 +227,7 @@ contract('AtomicErc721Loan', (accounts) => {
           0,
           erc20.address,
           0,
+          hightExpiry,
           vrs.v,
           vrs.r,
           vrs.s,
@@ -225,15 +236,22 @@ contract('AtomicErc721Loan', (accounts) => {
         '_atomicLoan: The loan hash was canceled'
       );
 
+      await atomic.cancelHash(erc721.address, 0, erc20.address, 0, hightExpiry, { from: signer });
+    });
+    it('try do an atomic loan with a cancel hash', async () => {
+      await atomic.approbeAtomicLoan(erc721.address, 0, erc20.address, 0, { from: signer });
+
+      await atomic.cancelHash(erc721.address, 0, erc20.address, 0, 0, { from: signer });
+
       await tryCatchRevert(
         () => borrowerC.atomicLoan(
-          calcHash(0, 0),
+          calcHash(0, 0, 0),
           { from: signer }
         ),
         '_atomicLoan: The loan hash was canceled'
       );
 
-      await atomic.cancelHash(erc721.address, 0, erc20.address, 0, { from: signer });
+      await atomic.cancelHash(erc721.address, 0, erc20.address, 0, 0, { from: signer });
     });
   });
 
@@ -241,7 +259,7 @@ contract('AtomicErc721Loan', (accounts) => {
     it('Approbe a atomic erc721 loan', async () => {
       const tokenId = random10bn();
       const price = random10bn();
-      const vrs = await calcSig(tokenId, price, signer);
+      const vrs = await calcSig(tokenId, price, 0, signer);
 
       assert.isFalse(await atomic.canceledHashes(signer, vrs.loanHash));
 
@@ -266,9 +284,9 @@ contract('AtomicErc721Loan', (accounts) => {
     it('Approbe a atomic erc721 loan', async () => {
       const tokenId = random10bn();
       const price = random10bn();
-      const vrs = await calcSig(tokenId, price, signer);
+      const vrs = await calcSig(tokenId, price, 0, signer);
 
-      await atomic.cancelHash(erc721.address, tokenId, erc20.address, price, { from: signer });
+      await atomic.cancelHash(erc721.address, tokenId, erc20.address, price, 0, { from: signer });
 
       assert.isTrue(await atomic.canceledHashes(signer, vrs.loanHash));
 
@@ -297,6 +315,7 @@ contract('AtomicErc721Loan', (accounts) => {
       expect(ReApproveHash._tokenId).to.eq.BN(tokenId);
       assert.equal(ReApproveHash._token20, erc20.address);
       expect(ReApproveHash._price).to.eq.BN(price);
+      expect(ReApproveHash._expiry).to.eq.BN(0);
 
       assert.isFalse(await atomic.canceledHashes(signer, vrs.loanHash));
     });
@@ -305,7 +324,7 @@ contract('AtomicErc721Loan', (accounts) => {
   describe('Function atomicLoan', function () {
     it('Do an atomic loan', async () => {
       const tokenId = random10bn();
-      const loanHash = calcHash(tokenId, 0);
+      const loanHash = calcHash(tokenId, 0, 0);
 
       await createApprove(signer, tokenId);
       await atomic.approbeAtomicLoan(erc721.address, tokenId, erc20.address, 0, { from: signer });
@@ -325,6 +344,7 @@ contract('AtomicErc721Loan', (accounts) => {
       expect(AtomicLoan._tokenId).to.eq.BN(tokenId);
       assert.equal(AtomicLoan._token20, erc20.address);
       expect(AtomicLoan._price).to.eq.BN(0);
+      expect(AtomicLoan._expiry).to.eq.BN(0);
 
       assert.equal(await erc721.ownerOf(tokenId), signer);
 
@@ -336,7 +356,7 @@ contract('AtomicErc721Loan', (accounts) => {
     it('Do an atomic loan with price', async () => {
       const tokenId = random10bn();
       const price = random10bn();
-      const loanHash = calcHash(tokenId, price);
+      const loanHash = calcHash(tokenId, price, 0);
 
       await createApprove(signer, tokenId);
       await atomic.approbeAtomicLoan(erc721.address, tokenId, erc20.address, price, { from: signer });
@@ -356,6 +376,7 @@ contract('AtomicErc721Loan', (accounts) => {
       expect(AtomicLoan._tokenId).to.eq.BN(tokenId);
       assert.equal(AtomicLoan._token20, erc20.address);
       expect(AtomicLoan._price).to.eq.BN(price);
+      expect(AtomicLoan._expiry).to.eq.BN(0);
 
       assert.equal(await erc721.ownerOf(tokenId), signer);
 
@@ -369,7 +390,7 @@ contract('AtomicErc721Loan', (accounts) => {
   describe('Function signedAtomicLoan', function () {
     it('Do a signed atomic loan', async () => {
       const tokenId = random10bn();
-      const vrs = await calcSig(tokenId, 0, signer);
+      const vrs = await calcSig(tokenId, 0, hightExpiry, signer);
 
       await createApprove(signer, tokenId);
       await erc20.setBalance(borrowerC.address, 0);
@@ -381,6 +402,7 @@ contract('AtomicErc721Loan', (accounts) => {
         tokenId,
         erc20.address,
         0,
+        hightExpiry,
         vrs.v,
         vrs.r,
         vrs.s,
@@ -394,6 +416,7 @@ contract('AtomicErc721Loan', (accounts) => {
       expect(AtomicLoan._tokenId).to.eq.BN(tokenId);
       assert.equal(AtomicLoan._token20, erc20.address);
       expect(AtomicLoan._price).to.eq.BN(0);
+      expect(AtomicLoan._expiry).to.eq.BN(hightExpiry);
 
       assert.equal(await erc721.ownerOf(tokenId), signer);
 
@@ -405,7 +428,7 @@ contract('AtomicErc721Loan', (accounts) => {
     it('Do a signed atomic loan with price', async () => {
       const tokenId = random10bn();
       const price = random10bn();
-      const vrs = await calcSig(tokenId, price, signer);
+      const vrs = await calcSig(tokenId, price, hightExpiry, signer);
 
       await createApprove(signer, tokenId);
       await erc20.setBalance(borrowerC.address, price);
@@ -417,6 +440,7 @@ contract('AtomicErc721Loan', (accounts) => {
         tokenId,
         erc20.address,
         price,
+        hightExpiry,
         vrs.v,
         vrs.r,
         vrs.s,
@@ -430,6 +454,7 @@ contract('AtomicErc721Loan', (accounts) => {
       expect(AtomicLoan._tokenId).to.eq.BN(tokenId);
       assert.equal(AtomicLoan._token20, erc20.address);
       expect(AtomicLoan._price).to.eq.BN(price);
+      expect(AtomicLoan._expiry).to.eq.BN(hightExpiry);
 
       assert.equal(await erc721.ownerOf(tokenId), signer);
 
@@ -437,6 +462,29 @@ contract('AtomicErc721Loan', (accounts) => {
       expect(await erc20.balanceOf(anAddress)).to.eq.BN(anAddressBal);
       expect(await erc20.balanceOf(atomic.address)).to.eq.BN(atomicBal);
       expect(await erc20.balanceOf(borrowerC.address)).to.eq.BN(borrowerCBal.sub(price));
+    });
+    it('try do a signed atomic loan with expired signature', async () => {
+      const tokenId = random10bn();
+      const vrs = await calcSig(tokenId, 0, 0, signer);
+
+      await createApprove(signer, tokenId);
+
+      await tryCatchRevert(
+        () => borrowerC.signedAtomicLoan(
+          erc721.address,
+          tokenId,
+          erc20.address,
+          0,
+          0,
+          vrs.v,
+          vrs.r,
+          vrs.s,
+          { from: anAddress }
+        ),
+        'signedAtomicLoan: The signature expired'
+      );
+
+      await borrowerC.setReturnToken(true);
     });
   });
 });

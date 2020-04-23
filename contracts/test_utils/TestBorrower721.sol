@@ -32,6 +32,7 @@ contract TestBorrower721 is IERC721TokenReceiver, ILoan721Pay {
         uint256 _tokenId,
         IERC20 _token20,
         uint256 _price,
+        uint256 _expired,
         uint8 _v,
         bytes32 _r,
         bytes32 _s
@@ -41,6 +42,7 @@ contract TestBorrower721 is IERC721TokenReceiver, ILoan721Pay {
             _tokenId,
             _token20,
             _price,
+            _expired,
             _v,
             _r,
             _s
