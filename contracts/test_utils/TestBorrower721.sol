@@ -49,10 +49,6 @@ contract TestBorrower721 is IERC721TokenReceiver, ILoan721Pay {
         );
     }
 
-    function atomicLoan(bytes32 _loanHash) external {
-        atomicErc721Loan.atomicLoan(_loanHash);
-    }
-
     function onERC721Received(address, address _from, uint256 _tokenId, bytes calldata) external override returns(bytes4) {
         _onERC721Received(_from, _tokenId);
 

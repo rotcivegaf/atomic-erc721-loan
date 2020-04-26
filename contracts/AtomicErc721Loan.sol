@@ -11,16 +11,7 @@ import "./interfaces/IERC20.sol";
 contract AtomicErc721Loan {
     using SafeMath for uint256;
 
-    mapping (address => mapping (bytes32 => bool)) public canceledHashes;
-    mapping (bytes32 => Loan) public loans;
-
-    struct Loan {
-        address owner;
-        IERC721 token721;
-        uint256 tokenId;
-        IERC20 token20;
-        uint256 price;
-    }
+    mapping(address => mapping(bytes32 => bool)) public canceledHashes;
 
     // Events
 
@@ -31,13 +22,6 @@ contract AtomicErc721Loan {
         IERC20 _token20,
         uint256 _price,
         uint256 _expiry
-    );
-
-    event ApprobeAtomicLoan(
-        IERC721 _token721,
-        uint256 _tokenId,
-        IERC20 _token20,
-        uint256 _price
     );
 
     event CancelHash(
@@ -57,28 +41,6 @@ contract AtomicErc721Loan {
     );
 
     // External functions
-
-    function approbeAtomicLoan(
-        IERC721 _token721,
-        uint256 _tokenId,
-        IERC20 _token20,
-        uint256 _price
-    ) external {
-        bytes32 loanHash = _calcHash(_token721, _tokenId, _token20, _price, 0);
-
-        if(canceledHashes[msg.sender][loanHash])
-            reApproveHash(_token721, _tokenId, _token20, _price, 0);
-
-        loans[loanHash] = Loan({
-            owner: msg.sender,
-            token721: _token721,
-            tokenId: _tokenId,
-            token20: _token20,
-            price: _price
-        });
-
-        emit ApprobeAtomicLoan(_token721, _tokenId, _token20, _price);
-    }
 
     /**
         @notice Cancel a loan hash
@@ -124,7 +86,8 @@ contract AtomicErc721Loan {
         bytes32 _r,
         bytes32 _s
     ) external {
-        require(now <= _expiry, "signedAtomicLoan: The signature expired");
+        // solium-disable-next-line
+        require(now <= _expiry, "signedAtomicLoan: The signature has expired");
 
         bytes32 loanHash = _calcHash(_token721, _tokenId, _token20, _price, _expiry);
         address owner = ecrecover(
@@ -139,29 +102,19 @@ contract AtomicErc721Loan {
             _s
         );
 
-        _atomicLoan(
-            owner,
-            _token721,
-            _tokenId,
-            _token20,
-            _price,
-            _expiry,
-            loanHash
-        );
-    }
+        require(!canceledHashes[owner][loanHash], "signedAtomicLoan: The loan hash was canceled");
 
-    function atomicLoan(bytes32 _loanHash) external {
-        Loan storage loan = loans[_loanHash];
+        uint256 ownerPrevBal = _token20.balanceOf(owner);
 
-        _atomicLoan(
-            loan.owner,
-            loan.token721,
-            loan.tokenId,
-            loan.token20,
-            loan.price,
-            0,
-            _loanHash
-        );
+        _token721.safeTransferFrom(owner, msg.sender, _tokenId);
+
+        ILoan721Pay(msg.sender).pay(owner, _token721, _tokenId, _token20, _price);
+
+        require(_token721.ownerOf(_tokenId) == owner, "signedAtomicLoan: Error return erc721 token");
+
+        require(_token20.balanceOf(owner).sub(ownerPrevBal) == _price, "signedAtomicLoan: Error pay the loan price");
+
+        emit AtomicLoan(owner, _token721, _tokenId, _token20, _price, _expiry);
     }
 
     // Internal functions
@@ -183,29 +136,5 @@ contract AtomicErc721Loan {
                 _expiry
             )
         );
-    }
-
-    function _atomicLoan(
-        address _owner,
-        IERC721 _token721,
-        uint256 _tokenId,
-        IERC20 _token20,
-        uint256 _price,
-        uint256 _expiry,
-        bytes32 _loanHash
-    ) internal {
-        require(!canceledHashes[_owner][_loanHash], "_atomicLoan: The loan hash was canceled");
-
-        uint256 ownerPrevBal = _token20.balanceOf(_owner);
-
-        _token721.safeTransferFrom(_owner, msg.sender, _tokenId);
-
-        ILoan721Pay(msg.sender).pay(_owner, _token721, _tokenId, _token20, _price);
-
-        require(_token721.ownerOf(_tokenId) == _owner, "_atomicLoan: Error return erc721 token");
-
-        require(_token20.balanceOf(_owner).sub(ownerPrevBal) == _price, "_atomicLoan: Error pay the loan price");
-
-        emit AtomicLoan(_owner, _token721, _tokenId, _token20, _price,_expiry);
     }
 }
